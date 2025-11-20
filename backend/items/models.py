@@ -15,7 +15,9 @@ class LostItem(models.Model):
     category = models.CharField(max_length=32, choices=CATEGORY_CHOICES)
     description = models.TextField(blank=True)
     date_found = models.DateField()
-    image = models.ImageField(upload_to="item_images/", blank=True, null=True)
+    # Switch to FileField for development so Pillow isn't required to run the dev server.
+    # Replace back to ImageField when Pillow is installed in the environment.
+    image = models.FileField(upload_to="item_images/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     claimed = models.BooleanField(default=False, help_text="Marked true when verified claimed by rightful owner")
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, help_text="Public unique identifier")
