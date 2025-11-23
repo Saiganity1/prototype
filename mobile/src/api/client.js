@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
-const BASE_URL = 'http://127.0.0.1:8000'; // Replace with LAN IP when testing on physical device (e.g. http://192.168.x.x:8000)
+// Allow override via Expo env (e.g. EXPO_PUBLIC_API_BASE_URL) or fallback to local dev
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000'; // For production set EXPO_PUBLIC_API_BASE_URL=https://your-service.onrender.com
 
 export async function fetchItems(page = 1) {
   const res = await fetch(`${BASE_URL}/api/items/?page=${page}`);

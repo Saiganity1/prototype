@@ -1,10 +1,24 @@
 from pathlib import Path
 import os
+import dj_database_url  # Parse DATABASE_URL for production
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-secret-key-change-me")
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+# Render sets environment variables; default DEBUG False unless explicitly enabled
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
+
+# Allow hosts from env (comma separated). Fallback to local development hosts.
+_allowed = os.getenv("ALLOWED_HOSTS")
+if _allowed:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+# Render provides RENDER_EXTERNAL_URL for the deployed service; include automatically.
+render_external = os.getenv("RENDER_EXTERNAL_URL")
+if render_external and render_external not in ALLOWED_HOSTS:
+    # e.g. https://lostfound-backend.onrender.com
+    ALLOWED_HOSTS.append(render_external.replace("https://", "").replace("http://", ""))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -22,6 +36,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # serve static files efficiently
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -57,6 +72,11 @@ DATABASES = {
     }
 }
 
+# Use DATABASE_URL if provided (e.g. from Render Postgres). ssl_require ensures encrypted connection.
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)
+
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = 'en-us'
@@ -64,8 +84,9 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -83,3 +104,15 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Extra security settings when not in DEBUG
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # CSRF trusted origins
+    if render_external:
+        CSRF_TRUSTED_ORIGINS = [render_external]
+    # Prevent content sniffing
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
